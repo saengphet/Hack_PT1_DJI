@@ -14,7 +14,7 @@ int AUX2; //A7 right   _ 0-511-1023
  NRF24 nrf24(10, 9);
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   setup_nrf ();
 
 }
@@ -29,7 +29,7 @@ void loop() {
    Serial.print(pitch);Serial.print("\t");
    Serial.print(AUX1);Serial.print("\t");
    Serial.print(AUX2);
-
+  delay(20);
 }
 
 void read_value () {
