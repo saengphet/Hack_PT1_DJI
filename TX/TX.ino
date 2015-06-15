@@ -29,7 +29,7 @@ void loop() {
    Serial.print(pitch);Serial.print("\t");
    Serial.print(AUX1);Serial.print("\t");
    Serial.print(AUX2);
-  delay(20);
+  
 }
 
 void read_value () {
