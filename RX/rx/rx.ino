@@ -10,9 +10,28 @@
 // audio out through the low pass filter
 // Tested on UNO
 
+
+
+//
+//            O       ^      O                   ^                                                      
+//              \          /                     ^                                                      
+//                \      /                       ^                                                      
+//                  ----                       Pitch       < < <  Roll > > >          ^                         ^            
+//                  |  |                         v                                      <                     >   
+//                  ----                         v                                         <               >        
+//                 /    \                        v                                             <       >       
+//               /        \                                                                       Yaw
+//             /            \                   
+//           O                O                   
+
+
+
 #include <NRF24.h>
 #include <SPI.h>
 #include <Servo.h> 
+#include "NazaDecoderLib.h"
+
+
 
 
 // Singleton instance of the radio
@@ -92,7 +111,7 @@ Servo myservo_AUX2;
 
 void setup() 
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   
 
   
@@ -130,53 +149,294 @@ void setup()
 
 
 unsigned long count = 0;
-
+ uint8_t buf[32];
+  uint8_t len = sizeof(buf);
+  
+  
 void loop()
 {
-  uint8_t buf[32];
-  uint8_t len = sizeof(buf);
+   //Timer = millis()/1000;
+   GPS();
+}
+  
+  
+  void GPS()
+{
+  
+    if(Serial.available())
+  {
+    uint8_t decodedMessage = NazaDecoder.decode(Serial.read());
+     //Serial.print("decodedMessage:");
+     //Serial.println(decodedMessage);
+    switch (decodedMessage)
+    {
+      case NAZA_MESSAGE_GPS:
+        //Serial.print("Lat: "); Serial.print(NazaDecoder.getLat(), 7);
+//        Serial.print(", Lon: "); Serial.print(NazaDecoder.getLon(), 7);
+//        Serial.print(", Alt: "); Serial.print(NazaDecoder.getGpsAlt(), 7);
+//        Serial.print(", Fix: "); Serial.print(NazaDecoder.getFixType());
+//        Serial.print(", Sat: "); Serial.println(NazaDecoder.getNumSat());
+        break;
+      case NAZA_MESSAGE_COMPASS:
+        //Serial.print("Heading: "); Serial.println(NazaDecoder.getHeadingNc(), 2);
+        RX_remote();
+        break;
+    }
 
-  nrf24.waitAvailable();
+  }
+  
+}
+
+  int StartTime,Timer,CountTime,Time_nextState;
+  
+  int CH_StartTime = 0, timeToFailSaft = 0;
+  
+  int up_AIvalue = 45 , // value for write servo up
+      up_AIvalue_MAX = 102,
+      up_AIvalue_MIN = 45;
+      
+   int yaw_AIvalue = 90 , roll_AIvalue = 90 , pitch_AIvalue = 90 ;
+      
+  int CH_up_AIvalue = 0 , // Check for " up_AIvalue++ " take one time
+      CH_up_AIvalue_TakeOff = 0, // Check for " up_AIvalue " take ++ or --
+      CH_hool = 0, //Check for hool altiture one time
+      CH_Start_TimeHool = 0, //Check for hool altiture one time
+      CH_Takeoff = 0;
+      
+  // When it cann't recive signal.
+  int Start_FailSafe_Time =0 , FailSafe_Time=0;
+  
+  
+  
+  
+  void RX_remote(){
+     //nrf24.waitAvailable();
   if (nrf24.recv(buf, &len)) // 140 microsecs
   {
-    uint8_t i;
-    //for (i = 0; i < 32; i++)
-    //{
-      Serial.print(buf[0]);  Serial.print("\t");  delayMicroseconds(65);
-      Serial.print(buf[1]);  Serial.print("\t");  delayMicroseconds(65);
-      Serial.print(buf[2]);  Serial.print("\t");  delayMicroseconds(65);
-      Serial.print(buf[3]);  Serial.print("\t");  delayMicroseconds(65);
-      Serial.print(buf[4]);  Serial.print("\t");  delayMicroseconds(65);
-      Serial.println(buf[5]);
-      
-      //analogWrite(6, buf[i]); // 15 microsecs
+
       // This delay was established experimentally to make sure the
       // buffer was exhausted just in time for the next packet to arrive     
+
+
+    
+     //vvvvvvvvvv Write Value to control  vvvvvvvvvvvvv
+   
+   
+    if(buf[5]<50){                 // 1       Auto fly
       
-    //}
+     myservo_AUX2.write(127);
+     
+     if(CH_StartTime == 0){       // Save start time, When you come this mode and take one time.
+       StartTime = millis()/100000;
+     }   
+     
+     Timer = millis()/100000;  
+     CountTime = Timer - StartTime;
+     //Time_nextState = CountTime-Time_nextState;
+     CH_StartTime=1;
+      
+     if(CH_StartTime == 1){   // Loop
+       
+          if(CountTime <= 2 && CH_Takeoff == 0){                                        // Start motor  and  hole in 2 sec
+                yaw_AIvalue = 45;
+                up_AIvalue = 45;
+                roll_AIvalue = 45;
+                pitch_AIvalue = 45;
+          }
+          
+          if(CountTime >= 2  &&  CountTime <= 5   &&   CH_Takeoff == 0){                // Take off in 3 sec
+                 up_AIvalue = up_AIvalue_MAX;
+                 yaw_AIvalue = 95;
+                 roll_AIvalue = 95;
+                 pitch_AIvalue = 95;
+                 if(CountTime == 4){                                                    // Take off is already.
+                       CH_Takeoff=1;                      
+                 }
+          }
+          
+          if(CountTime >= 5  &&  CountTime <= 8){                                      // Hole in 3 sec
+                 up_AIvalue = 86;
+                 yaw_AIvalue = 95;
+                 roll_AIvalue = 95;
+                 pitch_AIvalue = 95;
+          }
+          
+          if(CountTime >= 8  &&  CountTime <= 11){                                      // Landing in 3 sec
+          
+                 up_AIvalue = 83;
+                 yaw_AIvalue = 95;
+                 roll_AIvalue = 95;
+                 pitch_AIvalue = 95;
+          }
+          
+         if(CountTime >= 11){                                                            // Off
+          
+                yaw_AIvalue = 45;
+                up_AIvalue = 45;
+                roll_AIvalue = 45;
+                pitch_AIvalue = 45;
+          }
+          
+             
+          up_AIvalue = constrain(up_AIvalue, up_AIvalue_MIN, up_AIvalue_MAX);
+          
+          myservo_yaw.write(yaw_AIvalue);
+          myservo_up.write(up_AIvalue);
+          myservo_roll.write(roll_AIvalue);
+          myservo_pitch.write(pitch_AIvalue);
+         
+       
+       
+          Serial.print("StartTime : ");    Serial.print(StartTime);   Serial.print("\t CountTime: ");    Serial.print(CountTime);   Serial.print("\t up_AIvalue: ");    Serial.print(up_AIvalue);
+          Serial.print("\t CH_Takeoff: ");    Serial.print(CH_Takeoff);  
+         Serial.println("");
+       
+       
+       
+     }
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     /* // Old Logic
+
+     
+      if(CH_StartTime == 0){       
+       StartTime = Timer;
+     }
+     
+     CH_StartTime=1;
+     CH_up_AIvalue = 0;
+     
+     if(CH_StartTime == 1){        //3
+      
+      
+      if(Timer-StartTime <= 200){  // Start motor
+        Serial.print("start");
+        up_AIvalue = 45;
+        myservo_yaw.write(up_AIvalue);
+        myservo_up.write(up_AIvalue);
+        myservo_roll.write(up_AIvalue);
+        myservo_pitch.write(up_AIvalue);
+      }
+      
+      if(Timer-StartTime >= 200){
+        myservo_up.write(up_AIvalue);
+        if(millis()/10 >=8 && CH_up_AIvalue == 0){  //  bulid dely myself   &&   take one time over this delay loop
+          CH_up_AIvalue = 1;
+          
+          if(up_AIvalue <= up_AIvalue_MIN+5){
+            CH_up_AIvalue_TakeOff = 0;
+            CH_hool = 0;
+          }if(up_AIvalue >= up_AIvalue_MAX-1){
+            CH_up_AIvalue_TakeOff = 1;
+          }
+          
+          if(CH_up_AIvalue_TakeOff == 0){    // MIN value and take something
+            up_AIvalue++;
+          }else if(CH_up_AIvalue_TakeOff == 1){   // MAX value and take something
+            if(CH_hool == 0){        //hool altiture for 5 sec
+              if(CH_Start_TimeHool==0){ Start_hool=Timer; CH_Start_TimeHool=1;}
+              if(Timer - Start_hool <= 500){
+                 up_AIvalue = up_AIvalue_MAX;
+              }else { CH_hool=1; }
+            }else{
+              up_AIvalue--;
+            }
+          }
+        }
+          up_AIvalue = constrain(up_AIvalue, up_AIvalue_MIN, up_AIvalue_MAX);
+          CH_up_AIvalue = 0;
+       }         //4
+     }          //3
+      
+      Serial.print("Timer: "); Serial.print(Timer);Serial.print(" \tStartTime: "); Serial.print(StartTime); Serial.print("\tup_AIvalue: "); Serial.print(up_AIvalue);
+      Serial.print("\tCH_up_AIvalue_TakeOff: "); Serial.println(CH_up_AIvalue_TakeOff);
+     
+     */ // Old Logic
+     
+     
+   } //   1      if(buf[5]<50)
+   
+   
+   
+   
+      
+   else {  // Manual fly
+     Serial.print("Timer: "); Serial.println(Timer);       
+     Serial.print((map(buf[0],0,180,45,143)));  Serial.print("\t");  
+      Serial.print((map(buf[1],0,180,45,143)));  Serial.print("\t");  
+      Serial.print((map(buf[2],0,180,45,143)));  Serial.print("\t");  
+      Serial.print((map(buf[3],0,180,45,143)));  Serial.print("\t");  
+      Serial.print(buf[4]);  Serial.print("\t"); 
+      Serial.println(buf[5]);
+      
+      
+      if(buf[0]==buf[0] && buf[1]==buf[1] && buf[2]==buf[2] && buf[3] == buf[3]) {
+        timeToFailSaft++;
+        
+         Serial.print("timeToFailSaft : ");  Serial.println(timeToFailSaft); 
+        
+       // Serial.println(">>> Fail safe<<<");  
+      }
+      
+     CH_StartTime = 0; 
+     
+     
+      myservo_yaw.write(map(buf[0],0,180,45,143));
+      myservo_up.write(map(buf[1],0,180,45,143));
+      myservo_roll.write(map(buf[2],-5,180,45,143));
+      myservo_pitch.write(map(buf[3],0,180,45,143));
+      
+      if(buf[4]<50){
+        myservo_AUX1.write(45);
+      }else   if(buf[4]>50 && buf[4]<200){
+        myservo_AUX1.write(94);
+      }else   if(buf[4]>200){
+        myservo_AUX1.write(160);
+      }
+      
+        //if(buf[5]<50){
+       // myservo_AUX2.write(62);
+     // }else   
+      if(buf[5]>50 && buf[5]<200){
+        myservo_AUX2.write(95);
+      }else   if(buf[5]>200){
+        myservo_AUX2.write(127);
+      }
+    } 
+
+      
+       //^^^^^^^ Write Value to control ^^^^^ 
+      
     
-  myservo_yaw.write(map(buf[0],0,180,45,143));
-  myservo_up.write(map(buf[1],0,180,45,143));
-  myservo_roll.write(map(buf[2],0,180,45,143));
-  myservo_pitch.write(map(buf[3],0,180,45,143));
+    
+   } else{
+     Start_FailSafe_Time = millis()/100000;   
+     
+     FailSafe_Time = millis()/100000;  
+     
+     Serial.print("Start_FailSafe_Time: ");    Serial.print(Start_FailSafe_Time);  Serial.print("FailSafe_Time: ");    Serial.println(FailSafe_Time);
+   }
   
-  if(buf[4]<50){
-    myservo_AUX1.write(45);
-  }else   if(buf[4]>50 && buf[4]<200){
-    myservo_AUX1.write(94);
-  }else   if(buf[4]>200){
-    myservo_AUX1.write(160);
-  }
   
-    if(buf[5]<50){
-    myservo_AUX2.write(62);
-  }else   if(buf[5]>50 && buf[5]<200){
-    myservo_AUX2.write(95);
-  }else   if(buf[5]>200){
-    myservo_AUX2.write(127);
-  }
-    
-    
-  }
 }
+  
+  
+  
+
+
+
 

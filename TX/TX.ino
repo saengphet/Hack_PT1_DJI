@@ -94,4 +94,3 @@ void sent_value_nrf () {
      Serial.println("waitPacketSent failed");  
     digitalWrite(3, LOW);
 }
-
