@@ -39,6 +39,33 @@
  NRF24 nrf24(9, 10); // CE/CSN
 // NRF24 nrf24(8, 10);// For Leonardo, need explicit SS pin
 
+
+
+
+
+  int StartTime,Timer,CountTime,Time_nextState;
+  
+  int CH_StartTime = 0, timeToFailSaft = 0;
+  
+  int up_AIvalue = 45 , // value for write servo up
+      up_AIvalue_MAX = 102,
+      up_AIvalue_MIN = 45;
+      
+   int yaw_AIvalue = 90 , roll_AIvalue = 90 , pitch_AIvalue = 90 ;
+      
+  int CH_up_AIvalue = 0 , // Check for " up_AIvalue++ " take one time
+      CH_up_AIvalue_TakeOff = 0, // Check for " up_AIvalue " take ++ or --
+      CH_hool = 0, //Check for hool altiture one time
+      CH_Start_TimeHool = 0, //Check for hool altiture one time
+      CH_Takeoff = 0;
+   
+   //Fail_Safe   
+  int Start_FailSafe_Time =0 , FailSafe_Time=0;
+  int CH_FailSafe_Time = 0;
+  
+  
+  
+
 /**
  * Divides a given PWM pin frequency by a divisor.
  *
@@ -159,13 +186,14 @@ void loop()
    GPS();
 }
   
-  
+  int CH_GPS_Fail =0;
   void GPS()
 {
   
     if(Serial.available())
   {
     uint8_t decodedMessage = NazaDecoder.decode(Serial.read());
+    CH_GPS_Fail = 0;
      //Serial.print("decodedMessage:");
      //Serial.println(decodedMessage);
     switch (decodedMessage)
@@ -183,28 +211,20 @@ void loop()
         break;
     }
 
+  } else{
+    if(CH_GPS_Fail>=20000){
+         Serial.println("GPS Fail >>> Landing mode");
+           myservo_yaw.write(95);
+          myservo_up.write(83);
+          myservo_roll.write(95);
+          myservo_pitch.write(95);
+    }
+    CH_GPS_Fail++;
   }
   
 }
 
-  int StartTime,Timer,CountTime,Time_nextState;
-  
-  int CH_StartTime = 0, timeToFailSaft = 0;
-  
-  int up_AIvalue = 45 , // value for write servo up
-      up_AIvalue_MAX = 102,
-      up_AIvalue_MIN = 45;
-      
-   int yaw_AIvalue = 90 , roll_AIvalue = 90 , pitch_AIvalue = 90 ;
-      
-  int CH_up_AIvalue = 0 , // Check for " up_AIvalue++ " take one time
-      CH_up_AIvalue_TakeOff = 0, // Check for " up_AIvalue " take ++ or --
-      CH_hool = 0, //Check for hool altiture one time
-      CH_Start_TimeHool = 0, //Check for hool altiture one time
-      CH_Takeoff = 0;
-      
-  // When it cann't recive signal.
-  int Start_FailSafe_Time =0 , FailSafe_Time=0;
+
   
   
   
@@ -213,7 +233,7 @@ void loop()
      //nrf24.waitAvailable();
   if (nrf24.recv(buf, &len)) // 140 microsecs
   {
-
+      CH_FailSafe_Time = 0 ; //if can recive signal >>> reset value in fail-safe mode
       // This delay was established experimentally to make sure the
       // buffer was exhausted just in time for the next packet to arrive     
 
@@ -424,14 +444,38 @@ void loop()
     
     
    } else{
-     Start_FailSafe_Time = millis()/100000;   
-     
-     FailSafe_Time = millis()/100000;  
-     
-     Serial.print("Start_FailSafe_Time: ");    Serial.print(Start_FailSafe_Time);  Serial.print("FailSafe_Time: ");    Serial.println(FailSafe_Time);
+     Serial.println("Signal Lost >>> Go to Fail \"safe mode\"");
+     Fail_Safe();
    }
   
   
+}
+
+
+
+
+
+void Fail_Safe(){
+
+if(CH_FailSafe_Time == 0){
+           Start_FailSafe_Time = millis()/100000;   
+     }
+     CH_FailSafe_Time = 1;
+     FailSafe_Time = millis()/100000 - Start_FailSafe_Time; 
+    
+     if(CH_FailSafe_Time == 1){   // Loop
+       
+          if(FailSafe_Time >=  10){             // Start motor  and  hole in 2 sec
+              Serial.print(" Go to Haome ");
+              myservo_AUX2.write(77);
+          }
+          
+     }
+     
+    Serial.print(" \tFailSafe_Time: ");    Serial.println(FailSafe_Time);
+
+
+
 }
   
   
