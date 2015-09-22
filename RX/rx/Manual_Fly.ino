@@ -1,21 +1,12 @@
 
 void Manual_Fly(){
-     Serial.print("Timer: "); Serial.println(Timer);       
-     Serial.print((map(buf[0],0,180,45,143)));  Serial.print("\t");  
+      Serial.print("Timer: "); Serial.println(Timer);       
+      Serial.print((map(buf[0],0,180,45,143)));  Serial.print("\t");  
       Serial.print((map(buf[1],0,180,45,143)));  Serial.print("\t");  
       Serial.print((map(buf[2],0,180,45,143)));  Serial.print("\t");  
       Serial.print((map(buf[3],0,180,45,143)));  Serial.print("\t");  
       Serial.print(buf[4]);  Serial.print("\t"); 
       Serial.println(buf[5]);
-      
-      
-      if(buf[0]==buf[0] && buf[1]==buf[1] && buf[2]==buf[2] && buf[3] == buf[3]) {
-        timeToFailSaft++;
-        
-         Serial.print("timeToFailSaft : ");  Serial.println(timeToFailSaft); 
-        
-       // Serial.println(">>> Fail safe<<<");  
-      }
       
      CH_StartTime = 0; 
      

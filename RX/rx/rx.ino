@@ -39,8 +39,9 @@
  NRF24 nrf24(9, 10); // CE/CSN
 // NRF24 nrf24(8, 10);// For Leonardo, need explicit SS pin
 
-
-
+unsigned long count = 0;
+uint8_t buf[32];
+uint8_t len = sizeof(buf);
 
 
   int StartTime,Timer,CountTime,Time_nextState;
@@ -58,10 +59,35 @@
       CH_hool = 0, //Check for hool altiture one time
       CH_Start_TimeHool = 0, //Check for hool altiture one time
       CH_Takeoff = 0;
+
+
    
    //Fail_Safe   
   int Start_FailSafe_Time =0 , FailSafe_Time=0;
   int CH_FailSafe_Time = 0;
+
+  float lad1;
+  float log1;
+  float lad2 = 18.783161;
+  float log2 = 98.978784;
+ 
+  int Start_Altiture = 0;
+  int Altiture;
+  int min_Altiture = 1;           //ปรับค่าได้
+  int max_Altiture = 200;         //ปรับค่าได้
+
+  float Cal_distance;
+  float Cal_compass; //มุมเป้าหมาย
+ 
+  float Angle_Qand_in_moment;  //มุมของตัวเอง
+        
+
+  int caseSwitch = 1;
+
+  int CH_GPS_Fail =0; // ไว้หน่วงเวลา
+
+
+
   
   
   
@@ -139,9 +165,7 @@ Servo myservo_AUX2;
 void setup() 
 {
   Serial.begin(115200);
-  
-
-  
+ 
   myservo_yaw.attach(4);
   myservo_up.attach(3);
   myservo_roll.attach(6);
@@ -149,9 +173,7 @@ void setup()
   myservo_AUX1.attach(7);
   myservo_AUX2.attach(8);
   
-
-  
-  while (!Serial) 
+ while (!Serial) 
     ; // wait for serial port to connect. Needed for Leonardo only
   if (!nrf24.init())
     Serial.println("NRF24 init failed");
@@ -169,89 +191,26 @@ void setup()
   // Here we change the PWM frequency so we can render audio with better quality
   setPwmFrequency(6, 1); // PWM output on pin 6 is 62 khz
   Serial.println("initialised");
+
+  Read_GPS();                                 //อ่านค่า Altiture ครั้งแรก เพื่อเก็บค่า Alt ที่พื้น
+  Start_Altiture = NazaDecoder.getGpsAlt();
 }
 
 
 
 
 
-unsigned long count = 0;
- uint8_t buf[32];
-  uint8_t len = sizeof(buf);
+
   
   
 void loop()
 {
-   //Timer = millis()/1000;
    Read_GPS();
-    float i=calc_dist(18.782966 ,  98.978643 , 18.783586, 98.979147);
-  
-   Serial.println(i); 
-}
-
-
-
-  
-  int CH_GPS_Fail =0; // ไว้หน่วงเวลา
-  
-
-  void RX_remote(){
-     //nrf24.waitAvailable();
-  if (nrf24.recv(buf, &len)) // 140 microsecs
-  {
-      CH_FailSafe_Time = 0 ; //if can recive signal >>> reset value in fail-safe mode
-      // This delay was established experimentally to make sure the
-      // buffer was exhausted just in time for the next packet to arrive     
-      
-     //vvvvvvvvvv Write Value to control  vvvvvvvvvvvvv
-   
-   
-    if(buf[5]<50){                 //  Auto fly
-        Auto_Fly();
-   } 
-   else {  // Manual fly
-      Manual_Fly();
-    } 
-       //^^^^^^^ Write Value to control ^^^^^ 
-
-   } else{ //ถ้าสัญญาน Remote หาย
-     Serial.println("Signal Lost >>> Go to Fail \"safe mode\"");
-     Fail_Safe();
-   }
-  
-  
 }
 
 
 
 
-
-void Fail_Safe(){
-
-if(CH_FailSafe_Time == 0){
-           Start_FailSafe_Time = millis()/100000;   
-     }
-     CH_FailSafe_Time = 1;
-     FailSafe_Time = millis()/100000 - Start_FailSafe_Time; 
-    
-     if(CH_FailSafe_Time == 1){   // Loop
-       
-          if(FailSafe_Time >=  10){             // Start motor  and  hole in 2 sec
-              Serial.print(" Go to Haome ");
-              myservo_AUX2.write(77);
-          }
-          
-     }
-     
-    Serial.print(" \tFailSafe_Time: ");    Serial.println(FailSafe_Time);
-
-
-
-}
-  
-  
-  
-
-
-
-
+//ทำ ระบบ คาริเบต altiture ของ mix กะ max
+         // min_Altiture = Altiture - min_Altiture ;
+          //max_Altiture = Altiture + max_Altiture ;
