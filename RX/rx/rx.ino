@@ -30,6 +30,7 @@
 #include <SPI.h>
 #include <Servo.h> 
 #include "NazaDecoderLib.h"
+#include "LedControl.h"
 
 
 
@@ -39,8 +40,9 @@
  NRF24 nrf24(9, 10); // CE/CSN
 // NRF24 nrf24(8, 10);// For Leonardo, need explicit SS pin
 
-
-
+unsigned long count = 0;
+uint8_t buf[32];
+uint8_t len = sizeof(buf);
 
 
   int StartTime,Timer,CountTime,Time_nextState;
@@ -58,11 +60,50 @@
       CH_hool = 0, //Check for hool altiture one time
       CH_Start_TimeHool = 0, //Check for hool altiture one time
       CH_Takeoff = 0;
+
+
    
    //Fail_Safe   
   int Start_FailSafe_Time =0 , FailSafe_Time=0;
   int CH_FailSafe_Time = 0;
-  
+
+  float lad1 ;
+  float log1 ;
+  float lad2 = 14.882149;               // <<<<<<<<<<<<<  เปลี่ยนพิกัดเป้าหมายที่นี่
+  float log2 = 102.062082;              // <<<<<<<<<<<<<  เปลี่ยนพิกัดเป้าหมายที่นี
+
+  //float lad2 = 14.885455;          
+ // float log2 = 102.016204;  
+
+  int sat;
+  int sat_fix;
+
+ 
+  int Start_Altiture = 0;
+  int Altiture;
+  int min_Altiture = 1;           //ปรับค่าได้
+  int max_Altiture = 500;         //ปรับค่าได้
+
+  int High;
+  int min_High = 100;       //ปรับค่าได้
+  int max_High = 200;       //ปรับค่าได้
+
+  float Cal_distance;
+  float Cal_compass; //มุมเป้าหมาย
+ 
+  float Angle_Qand_in_moment;  //มุมของตัวเอง
+        
+
+  int caseSwitch = 1;
+
+  int CH_GPS_Fail =0; // ไว้หน่วงเวลา
+
+
+  bool check_gps_home = false; //ไว้เช๊คพิกัด ไว้กลับ Home
+  float home_lat;
+  float home_long;
+
+  bool check_go_to_gps = true; //ไว้เช๊คว่า ขาไปหาเป้าหมาย หรือขากลับ home
   
   
 
@@ -135,13 +176,23 @@ Servo myservo_pitch;
 Servo myservo_AUX1;
 Servo myservo_AUX2;
 
+#define trigPin 9 //_Sonar
+#define echoPin 2 //_Sonar
+
+LedControl lc=LedControl(A0,A1,A2,1); // เลข 1 คือจำนวนโมดูลแสดงผลที่ต่อ ในที่นี้ต่อ 1 โมดูล
+
+
 
 void setup() 
 {
   Serial.begin(115200);
+  pinMode(A5,OUTPUT);
+  digitalWrite(A5,LOW);
   
+  //initail_LED();
 
   
+ 
   myservo_yaw.attach(4);
   myservo_up.attach(3);
   myservo_roll.attach(6);
@@ -149,10 +200,8 @@ void setup()
   myservo_AUX1.attach(7);
   myservo_AUX2.attach(8);
   
-
-  
-  while (!Serial) 
-    ; // wait for serial port to connect. Needed for Leonardo only
+ //while (!Serial) ; // wait for serial port to connect. Needed for Leonardo only
+ 
   if (!nrf24.init())
     Serial.println("NRF24 init failed");
   if (!nrf24.setChannel(1))
@@ -169,89 +218,67 @@ void setup()
   // Here we change the PWM frequency so we can render audio with better quality
   setPwmFrequency(6, 1); // PWM output on pin 6 is 62 khz
   Serial.println("initialised");
+  
+  pinMode(trigPin, OUTPUT); //pin10 _Sonar
+  pinMode(echoPin, INPUT);  //pin9 _Sonar
+
+  //Read_GPS();                                 //อ่านค่า Altiture ครั้งแรก เพื่อเก็บค่า Alt ที่พื้น
+  //Start_Altiture = NazaDecoder.getGpsAlt();
 }
 
 
-
-
-
-unsigned long count = 0;
- uint8_t buf[32];
-  uint8_t len = sizeof(buf);
-  
-  
+bool manual_fly; 
 void loop()
 {
-   //Timer = millis()/1000;
-   Read_GPS();
-    float i=calc_dist(18.782966 ,  98.978643 , 18.783586, 98.979147);
-  
-   Serial.println(i); 
-}
-
-
-
-  
-  int CH_GPS_Fail =0; // ไว้หน่วงเวลา
-  
-
-  void RX_remote(){
-     //nrf24.waitAvailable();
-  if (nrf24.recv(buf, &len)) // 140 microsecs
-  {
-      CH_FailSafe_Time = 0 ; //if can recive signal >>> reset value in fail-safe mode
-      // This delay was established experimentally to make sure the
-      // buffer was exhausted just in time for the next packet to arrive     
-      
-     //vvvvvvvvvv Write Value to control  vvvvvvvvvvvvv
    
    
-    if(buf[5]<50){                 //  Auto fly
-        Auto_Fly();
-   } 
-   else {  // Manual fly
-      Manual_Fly();
-    } 
-       //^^^^^^^ Write Value to control ^^^^^ 
-
-   } else{ //ถ้าสัญญาน Remote หาย
-     Serial.println("Signal Lost >>> Go to Fail \"safe mode\"");
-     Fail_Safe();
-   }
-  
-  
-}
-
-
-
-
-
-void Fail_Safe(){
-
-if(CH_FailSafe_Time == 0){
-           Start_FailSafe_Time = millis()/100000;   
-     }
-     CH_FailSafe_Time = 1;
-     FailSafe_Time = millis()/100000 - Start_FailSafe_Time; 
-    
-     if(CH_FailSafe_Time == 1){   // Loop
-       
-          if(FailSafe_Time >=  10){             // Start motor  and  hole in 2 sec
-              Serial.print(" Go to Haome ");
-              myservo_AUX2.write(77);
+   if(Read_GPS()){
+              Read_GPS();
+              //LED_SAT(); 
+              if(sat_fix>=3){
+                digitalWrite(A5,HIGH);
+              }else{
+                digitalWrite(A5,LOW);
+              }
+              if(RX_remote()){
+                
+                        if(manual_fly){
+                          Manual_Fly();
+                        }else{
+                          //myservo_AUX2.write(95);
+                          myservo_AUX1.write(160);
+                          Auto_Fly();
+                          Read_Sonar();
+                        }
+              }else{
+                Serial.println("Signal Lost >>> Go to Fail \"safe mode\"");
+                Fail_Safe();
+                Landding();
+              }
+    }else{
+        if(CH_GPS_Fail>=20000){
+            Serial.println("GPS Fail >>> Landing mode_H");
+            myservo_yaw.write(95);
+            myservo_up.write(83);
+            myservo_roll.write(95);
+            myservo_pitch.write(95);
           }
-          
-     }
-     
-    Serial.print(" \tFailSafe_Time: ");    Serial.println(FailSafe_Time);
+        CH_GPS_Fail++;
+      }
+    
 
-
-
+   
 }
-  
-  
-  
+
+ void Landding(){
+   Serial.println("Signal Lost >>> Go to Fail \"Landding mode\"_H");
+          myservo_yaw.write(95);
+           myservo_up.write(83);
+            myservo_roll.write(95);
+           myservo_pitch.write(95);
+ }
 
 
-
-
+//ทำ ระบบ คาริเบต altiture ของ mix กะ max
+         // min_Altiture = Altiture - min_Altiture ;
+          //max_Altiture = Altiture + max_Altiture ;

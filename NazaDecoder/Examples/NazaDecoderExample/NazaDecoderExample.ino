@@ -12,6 +12,10 @@
 uint32_t currTime, attiTime;
 #endif
 
+float lad;
+
+
+
 void setup()
 {
   Serial.begin(115200);
@@ -19,17 +23,23 @@ void setup()
 
 void loop()
 {
+  
   if(Serial.available())
   {
     uint8_t decodedMessage = NazaDecoder.decode(Serial.read());
     switch (decodedMessage)
     {
       case NAZA_MESSAGE_GPS:
-        Serial.print("Lat: "); Serial.print(NazaDecoder.getLat(), 7);
-        Serial.print(", Lon: "); Serial.print(NazaDecoder.getLon(), 7);
-        Serial.print(", Alt: "); Serial.print(NazaDecoder.getGpsAlt(), 7);
+      lad=NazaDecoder.getLat();
+    
+
+        Serial.print("Lat: "); Serial.print(NazaDecoder.getLat(),7);
+        Serial.print(", Lon: "); Serial.print(NazaDecoder.getLon(),7);
+        Serial.print(", Alt: "); Serial.print(NazaDecoder.getGpsAlt(),7);
         Serial.print(", Fix: "); Serial.print(NazaDecoder.getFixType());
         Serial.print(", Sat: "); Serial.println(NazaDecoder.getNumSat());
+         Serial.print("____________________"); Serial.println(lad,7);
+     
         break;
       case NAZA_MESSAGE_COMPASS:
         Serial.print("Heading: "); Serial.println(NazaDecoder.getHeadingNc(), 2);

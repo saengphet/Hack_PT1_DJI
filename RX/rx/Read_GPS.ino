@@ -1,14 +1,13 @@
- float lad1;
- float log1;
 
 
-void Read_GPS()
+
+bool Read_GPS()
 {
   
     if(Serial.available())
   {
     uint8_t decodedMessage = NazaDecoder.decode(Serial.read());
-    CH_GPS_Fail = 0;
+    
      //Serial.print("decodedMessage:");
      //Serial.println(decodedMessage);
     switch (decodedMessage)
@@ -21,23 +20,32 @@ void Read_GPS()
 //        Serial.print(", Sat: "); Serial.println(NazaDecoder.getNumSat());
           lad1 = NazaDecoder.getLat();
           log1 = NazaDecoder.getLon();
+          
+          sat = NazaDecoder.getNumSat();
+          sat_fix = NazaDecoder.getFixType();
+          Altiture = abs(NazaDecoder.getGpsAlt() - Start_Altiture);
 
         break;
       case NAZA_MESSAGE_COMPASS:
         //Serial.print("Heading: "); Serial.println(NazaDecoder.getHeadingNc(), 2);
-        RX_remote();
+        Angle_Qand_in_moment = NazaDecoder.getHeadingNc(); //Get ค่ามุมของเครื่อง ณ ขณะนี้
+
+        return true;
+       // RX_remote();
         break;
     }
+    CH_GPS_Fail = 0; //รีเซตเวลา GPS Time fail 
 
-  } else{ //ถ้า GPS Fail ให้มัน ลงจอด
-    if(CH_GPS_Fail>=20000){
-          Serial.println("GPS Fail >>> Landing mode");
-          myservo_yaw.write(95);
-          myservo_up.write(83);
-          myservo_roll.write(95);
-          myservo_pitch.write(95);
-    }
-    CH_GPS_Fail++;
-  }
+  } //else{ //ถ้า GPS Fail ให้มัน ลงจอด
+//    return false;
+//    if(CH_GPS_Fail>=20000){
+//          Serial.println("GPS Fail >>> Landing mode");
+//          myservo_yaw.write(95);
+//          myservo_up.write(83);
+//          myservo_roll.write(95);
+//          myservo_pitch.write(95);
+//    }
+//    CH_GPS_Fail++;
+//  }
   
 }
