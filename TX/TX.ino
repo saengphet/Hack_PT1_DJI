@@ -34,12 +34,12 @@ void loop() {
 
 void read_value () {
   // Read pin                   Tuning value to 0-180              Reverse value
-  yaw = (analogRead(A0));    yaw = map(yaw,100,781,0,180);       yaw = 180-yaw;
-  up = (analogRead(A1));     up = map(up,187,810,0,180);         
-  roll = (analogRead(A2));   roll = map(roll,246,935,0,180);     roll = 180-roll;
-  pitch = (analogRead(A3));  pitch = map(pitch,214,795,0,180);   pitch = 180-pitch;
-  AUX1 = (analogRead(A6));   AUX1 = map(AUX1,0,1023,0,255);
-  AUX2 = (analogRead(A7));   AUX2 = map(AUX2,0,1023,0,255);
+//  yaw = (analogRead(A0));    yaw = map(yaw,100,781,0,180);       yaw = 180-yaw;
+//  up = (analogRead(A1));     up = map(up,187,810,0,180);         
+//  roll = (analogRead(A2));   roll = map(roll,246,935,0,180);     roll = 180-roll;
+//  pitch = (analogRead(A3));  pitch = map(pitch,214,795,0,180);   pitch = 180-pitch;
+//  AUX1 = (analogRead(A6));   AUX1 = map(AUX1,0,1023,0,255);
+//  AUX2 = (analogRead(A7));   AUX2 = map(AUX2,0,1023,0,255);
 }
 
 
